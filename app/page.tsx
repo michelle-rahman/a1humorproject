@@ -1,7 +1,7 @@
 export default function Home() {
   return (
-      <main>
-        <h1>Hello World</h1>
+      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <h1 style={{ fontSize: '72px' }}>Hello World</h1>
       </main>
   );
 }
