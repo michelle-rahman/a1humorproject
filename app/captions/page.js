@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function CaptionsPage() {
+export default function Home() {
     const [captions, setCaptions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -37,7 +37,6 @@ export default function CaptionsPage() {
             <div style={{ display: 'grid', gap: '20px' }}>
                 {captions.map((caption) => (
                     <div key={caption.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-                        <p><strong>ID:</strong> {caption.id}</p>
                         <p><strong>Content:</strong> {caption.content}</p>
                         <p style={{ fontSize: '12px', color: '#666' }}><strong>Created:</strong> {new Date(caption.created_datetime_utc).toLocaleDateString()}</p>
                     </div>
