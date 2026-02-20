@@ -1,8 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')
 
@@ -16,9 +17,9 @@ export async function GET(request) {
                     getAll() {
                         return cookieStore.getAll()
                     },
-                    setAll(cookiesToSet) {
+                    setAll(cookiesToSet: any) {
                         try {
-                            cookiesToSet.forEach(({ name, value, options }) =>
+                            cookiesToSet.forEach(({ name, value, options }: any) =>
                                 cookieStore.set(name, value, options)
                             )
                         } catch {
@@ -27,7 +28,7 @@ export async function GET(request) {
                     },
                 },
             }
-    )
+        )
 
         await supabase.auth.exchangeCodeForSession(code)
     }
