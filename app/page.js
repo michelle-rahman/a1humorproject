@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase-client';
 import { useRouter } from 'next/navigation';
+import { generatePresignedUrl, uploadImageToPresignedUrl, registerImageUrl, generateCaptions } from '@/lib/caption-pipeline';
 
 export default function Home() {
     const [captions, setCaptions] = useState([]);
@@ -12,6 +13,9 @@ export default function Home() {
     const [error, setError] = useState(null);
     const [userVotes, setUserVotes] = useState({});
     const [votingId, setVotingId] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [userToken, setUserToken] = useState(null);
+    const [uploadedImage, setUploadedImage] = useState(null);
     const router = useRouter();
     const supabaseClient = createClient();
 
@@ -25,6 +29,13 @@ export default function Home() {
             }
 
             setUser(user);
+
+            // Get the user's session token for API calls
+            const { data } = await supabaseClient.auth.getSession();
+            if (data.session) {
+                setUserToken(data.session.access_token);
+            }
+
             fetchCaptions();
             fetchUserVotes(user.id);
         };
@@ -67,13 +78,49 @@ export default function Home() {
         }
     };
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file || !userToken) return;
+
+        setUploading(true);
+
+        // Show the uploaded image preview
+        const imageUrl = URL.createObjectURL(file);
+        setUploadedImage(imageUrl);
+
+        try {
+            // Step 1: Generate presigned URL
+            const { presignedUrl, cdnUrl } = await generatePresignedUrl(userToken, file.type);
+
+            // Step 2: Upload image to presigned URL
+            await uploadImageToPresignedUrl(presignedUrl, file);
+
+            // Step 3: Register image URL
+            const { imageId } = await registerImageUrl(userToken, cdnUrl);
+
+            // Step 4: Generate captions
+            const generatedCaptions = await generateCaptions(userToken, imageId);
+
+            // Add generated captions to the list
+            if (generatedCaptions && Array.isArray(generatedCaptions)) {
+                setCaptions(prev => [...generatedCaptions, ...prev]);
+            }
+
+            alert('Image processed and captions generated!');
+        } catch (err) {
+            console.error('Error uploading image:', err);
+            alert('Failed to process image: ' + err.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const handleVote = async (captionId, voteValue) => {
         if (!user) return;
 
         setVotingId(captionId);
 
         try {
-            // Check if user already voted on this caption
             const { data: existingVote } = await supabase
                 .from('caption_votes')
                 .select('id')
@@ -81,7 +128,6 @@ export default function Home() {
                 .eq('profile_id', user.id);
 
             if (existingVote && existingVote.length > 0) {
-                // Update existing vote
                 const { error } = await supabase
                     .from('caption_votes')
                     .update({
@@ -92,7 +138,6 @@ export default function Home() {
 
                 if (error) throw error;
             } else {
-                // Insert new vote with timestamp
                 const now = new Date().toISOString();
                 const { error } = await supabase
                     .from('caption_votes')
@@ -107,7 +152,6 @@ export default function Home() {
                 if (error) throw error;
             }
 
-            // Update local state
             setUserVotes(prev => ({
                 ...prev,
                 [captionId]: voteValue
@@ -133,7 +177,7 @@ export default function Home() {
         <main style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
-                    <h1>Captions List</h1>
+                    <h1 style={{ color: '#fff' }}>Captions List</h1>
                     <p style={{ fontSize: '14px', color: '#666' }}>Logged in as: {user.email}</p>
                 </div>
                 <button
@@ -150,6 +194,48 @@ export default function Home() {
                     Logout
                 </button>
             </div>
+
+            <div style={{ marginBottom: '30px', padding: '30px', backgroundColor: '#ffffff', borderRadius: '8px', border: '2px solid #ddd' }}>
+                <h2 style={{ color: '#000', fontSize: '28px', marginBottom: '20px' }}>Upload Image for Caption Generation</h2>
+
+                <label style={{
+                    display: 'inline-block',
+                    padding: '12px 24px',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    borderRadius: '6px',
+                    cursor: uploading ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    transition: 'background-color 0.3s',
+                }}>
+                    Choose Image
+                    <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                        style={{
+                            display: 'none'
+                        }}
+                    />
+                </label>
+
+                {uploading && <p style={{ color: '#000', marginTop: '10px', fontSize: '16px' }}>⏳ Processing image...</p>}
+
+                {uploadedImage && (
+                    <div style={{ marginTop: '20px' }}>
+                        <h3 style={{ color: '#000', fontSize: '18px', marginBottom: '10px' }}>Uploaded Image</h3>
+                        <img
+                            src={uploadedImage}
+                            alt="Uploaded"
+                            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px' }}
+                        />
+                    </div>
+                )}
+            </div>
+
+            <h2 style={{ color: '#fff' }}>Generated Captions</h2>
             <div style={{ display: 'grid', gap: '20px' }}>
                 {captions.map((caption) => (
                     <div key={caption.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
