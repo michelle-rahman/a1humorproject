@@ -10,6 +10,8 @@ export default function Home() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [userVotes, setUserVotes] = useState({});
+    const [votingId, setVotingId] = useState(null);
     const router = useRouter();
     const supabaseClient = createClient();
 
@@ -24,6 +26,7 @@ export default function Home() {
 
             setUser(user);
             fetchCaptions();
+            fetchUserVotes(user.id);
         };
 
         checkAuthAndFetch();
@@ -42,6 +45,78 @@ export default function Home() {
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchUserVotes = async (userId) => {
+        try {
+            const { data, error } = await supabase
+                .from('caption_votes')
+                .select('caption_id, vote_value')
+                .eq('profile_id', userId);
+
+            if (error) throw error;
+
+            const votesMap = {};
+            data.forEach(vote => {
+                votesMap[vote.caption_id] = vote.vote_value;
+            });
+            setUserVotes(votesMap);
+        } catch (err) {
+            console.error('Error fetching votes:', err);
+        }
+    };
+
+    const handleVote = async (captionId, voteValue) => {
+        if (!user) return;
+
+        setVotingId(captionId);
+
+        try {
+            // Check if user already voted on this caption
+            const { data: existingVote } = await supabase
+                .from('caption_votes')
+                .select('id')
+                .eq('caption_id', captionId)
+                .eq('profile_id', user.id);
+
+            if (existingVote && existingVote.length > 0) {
+                // Update existing vote
+                const { error } = await supabase
+                    .from('caption_votes')
+                    .update({
+                        vote_value: voteValue,
+                        modified_datetime_utc: new Date().toISOString()
+                    })
+                    .eq('id', existingVote[0].id);
+
+                if (error) throw error;
+            } else {
+                // Insert new vote with timestamp
+                const now = new Date().toISOString();
+                const { error } = await supabase
+                    .from('caption_votes')
+                    .insert({
+                        caption_id: captionId,
+                        profile_id: user.id,
+                        vote_value: voteValue,
+                        created_datetime_utc: now,
+                        modified_datetime_utc: now
+                    });
+
+                if (error) throw error;
+            }
+
+            // Update local state
+            setUserVotes(prev => ({
+                ...prev,
+                [captionId]: voteValue
+            }));
+        } catch (err) {
+            console.error('Error voting:', err);
+            alert('Failed to submit vote: ' + err.message);
+        } finally {
+            setVotingId(null);
         }
     };
 
@@ -77,9 +152,39 @@ export default function Home() {
             </div>
             <div style={{ display: 'grid', gap: '20px' }}>
                 {captions.map((caption) => (
-                    <div key={caption.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-                        <p><strong>Content:</strong> {caption.content}</p>
+                    <div key={caption.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                        <p style={{ color: '#000' }}><strong>Content:</strong> {caption.content}</p>
                         <p style={{ fontSize: '12px', color: '#666' }}><strong>Created:</strong> {new Date(caption.created_datetime_utc).toLocaleDateString()}</p>
+                        <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+                            <button
+                                onClick={() => handleVote(caption.id, 1)}
+                                disabled={votingId === caption.id}
+                                style={{
+                                    padding: '8px 15px',
+                                    backgroundColor: userVotes[caption.id] === 1 ? '#4CAF50' : '#e0e0e0',
+                                    color: userVotes[caption.id] === 1 ? 'white' : '#333',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: votingId === caption.id ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                👍 Upvote
+                            </button>
+                            <button
+                                onClick={() => handleVote(caption.id, -1)}
+                                disabled={votingId === caption.id}
+                                style={{
+                                    padding: '8px 15px',
+                                    backgroundColor: userVotes[caption.id] === -1 ? '#f44336' : '#e0e0e0',
+                                    color: userVotes[caption.id] === -1 ? 'white' : '#333',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: votingId === caption.id ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                👎 Downvote
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>
