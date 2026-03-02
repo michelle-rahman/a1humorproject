@@ -46,7 +46,7 @@ export default function Home() {
         try {
             const { data, error } = await supabase
                 .from('captions')
-                .select('*')
+                .select('*, images(url)')
                 .limit(20);
 
             if (error) throw error;
@@ -302,7 +302,8 @@ export default function Home() {
                                     padding: '20px',
                                     borderRadius: '12px',
                                     boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-                                    transition: 'all 0.3s ease'
+                                    transition: 'all 0.3s ease',
+                                    overflow: 'hidden'
                                 }}
                                      onMouseEnter={(e) => {
                                          e.currentTarget.style.boxShadow = '0 6px 25px rgba(0,0,0,0.15)';
@@ -312,6 +313,19 @@ export default function Home() {
                                          e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
                                          e.currentTarget.style.transform = 'translateY(0)';
                                      }}>
+                                    {caption.images && caption.images.url && (
+                                        <img
+                                            src={caption.images.url}
+                                            alt={caption.content}
+                                            style={{
+                                                width: '100%',
+                                                height: '250px',
+                                                objectFit: 'cover',
+                                                borderRadius: '8px',
+                                                marginBottom: '15px'
+                                            }}
+                                        />
+                                    )}
                                     <p style={{ color: '#000', fontSize: '16px', margin: '0 0 10px 0', lineHeight: '1.6' }}>
                                         <strong>💬 {caption.content}</strong>
                                     </p>
