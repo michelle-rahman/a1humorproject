@@ -272,7 +272,7 @@ export default function Home() {
                                 alt="Uploaded"
                                 style={{
                                     maxWidth: '100%',
-                                    maxHeight: '400px',
+                                    height: 'auto',
                                     borderRadius: '8px',
                                     boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
                                 }}
@@ -319,8 +319,9 @@ export default function Home() {
                                             alt={caption.content}
                                             style={{
                                                 width: '100%',
-                                                height: '250px',
-                                                objectFit: 'cover',
+                                                height: 'auto',
+                                                maxHeight: '500px',
+                                                objectFit: 'contain',
                                                 borderRadius: '8px',
                                                 marginBottom: '15px'
                                             }}
