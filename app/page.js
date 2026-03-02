@@ -30,7 +30,6 @@ export default function Home() {
 
             setUser(user);
 
-            // Get the user's session token for API calls
             const { data } = await supabaseClient.auth.getSession();
             if (data.session) {
                 setUserToken(data.session.access_token);
@@ -84,24 +83,15 @@ export default function Home() {
 
         setUploading(true);
 
-        // Show the uploaded image preview
         const imageUrl = URL.createObjectURL(file);
         setUploadedImage(imageUrl);
 
         try {
-            // Step 1: Generate presigned URL
             const { presignedUrl, cdnUrl } = await generatePresignedUrl(userToken, file.type);
-
-            // Step 2: Upload image to presigned URL
             await uploadImageToPresignedUrl(presignedUrl, file);
-
-            // Step 3: Register image URL
             const { imageId } = await registerImageUrl(userToken, cdnUrl);
-
-            // Step 4: Generate captions
             const generatedCaptions = await generateCaptions(userToken, imageId);
 
-            // Add generated captions to the list
             if (generatedCaptions && Array.isArray(generatedCaptions)) {
                 setCaptions(prev => [...generatedCaptions, ...prev]);
             }
@@ -169,110 +159,220 @@ export default function Home() {
         router.push('/login');
     };
 
-    if (loading) return <div style={{ padding: '20px' }}>Loading...</div>;
+    if (loading) return (
+        <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            fontSize: '18px',
+            color: '#666'
+        }}>
+            Loading...
+        </div>
+    );
     if (!user) return null;
-    if (error) return <div style={{ padding: '20px', color: 'red' }}>Error: {error}</div>;
+    if (error) return <div style={{ padding: '20px', color: '#f44336', fontSize: '16px' }}>Error: {error}</div>;
 
     return (
-        <main style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <main style={{ background: '#f5f5f5', minHeight: '100vh', paddingBottom: '40px' }}>
+            {/* Header */}
+            <header style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                padding: '30px 20px',
+                color: 'white',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+            }}>
                 <div>
-                    <h1 style={{ color: '#fff' }}>Captions List</h1>
-                    <p style={{ fontSize: '14px', color: '#666' }}>Logged in as: {user.email}</p>
+                    <h1 style={{ margin: '0 0 5px 0', fontSize: '28px' }}>🎬 Humor Project</h1>
+                    <p style={{ margin: '0', fontSize: '14px', opacity: '0.9' }}>Logged in as: {user.email}</p>
                 </div>
                 <button
                     onClick={handleLogout}
                     style={{
-                        padding: '10px 20px',
-                        backgroundColor: '#f44336',
+                        padding: '10px 24px',
+                        backgroundColor: 'rgba(255,255,255,0.2)',
                         color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
+                        border: '2px solid white',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = 'rgba(255,255,255,0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
                     }}
                 >
                     Logout
                 </button>
-            </div>
+            </header>
 
-            <div style={{ marginBottom: '30px', padding: '30px', backgroundColor: '#ffffff', borderRadius: '8px', border: '2px solid #ddd' }}>
-                <h2 style={{ color: '#000', fontSize: '28px', marginBottom: '20px' }}>Upload Image for Caption Generation</h2>
-
-                <label style={{
-                    display: 'inline-block',
-                    padding: '12px 24px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    borderRadius: '6px',
-                    cursor: uploading ? 'not-allowed' : 'pointer',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    transition: 'background-color 0.3s',
+            <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '30px 20px' }}>
+                {/* Upload Section */}
+                <div style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px',
+                    padding: '40px',
+                    marginBottom: '40px',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
                 }}>
-                    Choose Image
-                    <input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
-                        onChange={handleImageUpload}
-                        disabled={uploading}
-                        style={{
-                            display: 'none'
-                        }}
-                    />
-                </label>
+                    <h2 style={{ color: '#000', fontSize: '26px', marginBottom: '10px', margin: '0 0 10px 0' }}>
+                        📸 Upload Image for Caption Generation
+                    </h2>
+                    <p style={{ color: '#666', marginBottom: '30px', fontSize: '14px' }}>
+                        Upload an image and our AI will generate hilarious captions
+                    </p>
 
-                {uploading && <p style={{ color: '#000', marginTop: '10px', fontSize: '16px' }}>⏳ Processing image...</p>}
-
-                {uploadedImage && (
-                    <div style={{ marginTop: '20px' }}>
-                        <h3 style={{ color: '#000', fontSize: '18px', marginBottom: '10px' }}>Uploaded Image</h3>
-                        <img
-                            src={uploadedImage}
-                            alt="Uploaded"
-                            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px' }}
+                    <label style={{
+                        display: 'inline-block',
+                        padding: '14px 32px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        borderRadius: '8px',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 15px rgba(76,175,80,0.3)'
+                    }}
+                           onMouseEnter={(e) => {
+                               if (!uploading) {
+                                   e.target.style.backgroundColor = '#45a049';
+                                   e.target.style.transform = 'translateY(-2px)';
+                                   e.target.style.boxShadow = '0 6px 20px rgba(76,175,80,0.4)';
+                               }
+                           }}
+                           onMouseLeave={(e) => {
+                               e.target.style.backgroundColor = '#4CAF50';
+                               e.target.style.transform = 'translateY(0)';
+                               e.target.style.boxShadow = '0 4px 15px rgba(76,175,80,0.3)';
+                           }}>
+                        {uploading ? '⏳ Processing...' : '📁 Choose Image'}
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
+                            onChange={handleImageUpload}
+                            disabled={uploading}
+                            style={{ display: 'none' }}
                         />
-                    </div>
-                )}
-            </div>
+                    </label>
 
-            <h2 style={{ color: '#fff' }}>Generated Captions</h2>
-            <div style={{ display: 'grid', gap: '20px' }}>
-                {captions.map((caption) => (
-                    <div key={caption.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
-                        <p style={{ color: '#000' }}><strong>Content:</strong> {caption.content}</p>
-                        <p style={{ fontSize: '12px', color: '#666' }}><strong>Created:</strong> {new Date(caption.created_datetime_utc).toLocaleDateString()}</p>
-                        <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
-                            <button
-                                onClick={() => handleVote(caption.id, 1)}
-                                disabled={votingId === caption.id}
+                    {uploadedImage && (
+                        <div style={{ marginTop: '30px' }}>
+                            <h3 style={{ color: '#000', fontSize: '18px', marginBottom: '15px' }}>Uploaded Image Preview</h3>
+                            <img
+                                src={uploadedImage}
+                                alt="Uploaded"
                                 style={{
-                                    padding: '8px 15px',
-                                    backgroundColor: userVotes[caption.id] === 1 ? '#4CAF50' : '#e0e0e0',
-                                    color: userVotes[caption.id] === 1 ? 'white' : '#333',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: votingId === caption.id ? 'not-allowed' : 'pointer'
+                                    maxWidth: '100%',
+                                    maxHeight: '400px',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
                                 }}
-                            >
-                                👍 Upvote
-                            </button>
-                            <button
-                                onClick={() => handleVote(caption.id, -1)}
-                                disabled={votingId === caption.id}
-                                style={{
-                                    padding: '8px 15px',
-                                    backgroundColor: userVotes[caption.id] === -1 ? '#f44336' : '#e0e0e0',
-                                    color: userVotes[caption.id] === -1 ? 'white' : '#333',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: votingId === caption.id ? 'not-allowed' : 'pointer'
-                                }}
-                            >
-                                👎 Downvote
-                            </button>
+                            />
                         </div>
+                    )}
+                </div>
+
+                {/* Captions Section */}
+                <div>
+                    <h2 style={{ color: '#000', fontSize: '26px', marginBottom: '20px' }}>✨ Generated Captions</h2>
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        {captions.length === 0 ? (
+                            <div style={{
+                                backgroundColor: '#ffffff',
+                                padding: '40px',
+                                borderRadius: '12px',
+                                textAlign: 'center',
+                                color: '#999'
+                            }}>
+                                <p style={{ fontSize: '16px' }}>Upload an image to generate captions</p>
+                            </div>
+                        ) : (
+                            captions.map((caption) => (
+                                <div key={caption.id} style={{
+                                    backgroundColor: '#ffffff',
+                                    padding: '20px',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                                    transition: 'all 0.3s ease'
+                                }}
+                                     onMouseEnter={(e) => {
+                                         e.currentTarget.style.boxShadow = '0 6px 25px rgba(0,0,0,0.15)';
+                                         e.currentTarget.style.transform = 'translateY(-2px)';
+                                     }}
+                                     onMouseLeave={(e) => {
+                                         e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+                                         e.currentTarget.style.transform = 'translateY(0)';
+                                     }}>
+                                    <p style={{ color: '#000', fontSize: '16px', margin: '0 0 10px 0', lineHeight: '1.6' }}>
+                                        <strong>💬 {caption.content}</strong>
+                                    </p>
+                                    <p style={{ fontSize: '12px', color: '#999', margin: '0 0 15px 0' }}>
+                                        📅 {new Date(caption.created_datetime_utc).toLocaleDateString()}
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <button
+                                            onClick={() => handleVote(caption.id, 1)}
+                                            disabled={votingId === caption.id}
+                                            style={{
+                                                padding: '10px 16px',
+                                                backgroundColor: userVotes[caption.id] === 1 ? '#4CAF50' : '#e0e0e0',
+                                                color: userVotes[caption.id] === 1 ? 'white' : '#333',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: votingId === caption.id ? 'not-allowed' : 'pointer',
+                                                fontWeight: 'bold',
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (votingId !== caption.id) {
+                                                    e.target.style.transform = 'scale(1.05)';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.transform = 'scale(1)';
+                                            }}
+                                        >
+                                            👍 Upvote
+                                        </button>
+                                        <button
+                                            onClick={() => handleVote(caption.id, -1)}
+                                            disabled={votingId === caption.id}
+                                            style={{
+                                                padding: '10px 16px',
+                                                backgroundColor: userVotes[caption.id] === -1 ? '#f44336' : '#e0e0e0',
+                                                color: userVotes[caption.id] === -1 ? 'white' : '#333',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: votingId === caption.id ? 'not-allowed' : 'pointer',
+                                                fontWeight: 'bold',
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (votingId !== caption.id) {
+                                                    e.target.style.transform = 'scale(1.05)';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.transform = 'scale(1)';
+                                            }}
+                                        >
+                                            👎 Downvote
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
-                ))}
+                </div>
             </div>
         </main>
     );
