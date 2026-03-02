@@ -299,11 +299,12 @@ export default function Home() {
                             captions.map((caption) => (
                                 <div key={caption.id} style={{
                                     backgroundColor: '#ffffff',
-                                    padding: '20px',
                                     borderRadius: '12px',
                                     boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
                                     transition: 'all 0.3s ease',
-                                    overflow: 'hidden'
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    flexDirection: 'column'
                                 }}
                                      onMouseEnter={(e) => {
                                          e.currentTarget.style.boxShadow = '0 6px 25px rgba(0,0,0,0.15)';
@@ -314,74 +315,81 @@ export default function Home() {
                                          e.currentTarget.style.transform = 'translateY(0)';
                                      }}>
                                     {caption.images && caption.images.url && (
-                                        <img
-                                            src={caption.images.url}
-                                            alt={caption.content}
-                                            style={{
-                                                width: '100%',
-                                                height: 'auto',
-                                                maxHeight: '500px',
-                                                objectFit: 'contain',
-                                                borderRadius: '8px',
-                                                marginBottom: '15px'
-                                            }}
-                                        />
+                                        <div style={{
+                                            width: '100%',
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#f0f0f0'
+                                        }}>
+                                            <img
+                                                src={caption.images.url}
+                                                alt={caption.content}
+                                                style={{
+                                                    width: '100%',
+                                                    height: 'auto',
+                                                    maxHeight: '500px',
+                                                    objectFit: 'contain'
+                                                }}
+                                            />
+                                        </div>
                                     )}
-                                    <p style={{ color: '#000', fontSize: '16px', margin: '0 0 10px 0', lineHeight: '1.6' }}>
-                                        <strong>💬 {caption.content}</strong>
-                                    </p>
-                                    <p style={{ fontSize: '12px', color: '#999', margin: '0 0 15px 0' }}>
-                                        📅 {new Date(caption.created_datetime_utc).toLocaleDateString()}
-                                    </p>
-                                    <div style={{ display: 'flex', gap: '10px' }}>
-                                        <button
-                                            onClick={() => handleVote(caption.id, 1)}
-                                            disabled={votingId === caption.id}
-                                            style={{
-                                                padding: '10px 16px',
-                                                backgroundColor: userVotes[caption.id] === 1 ? '#4CAF50' : '#e0e0e0',
-                                                color: userVotes[caption.id] === 1 ? 'white' : '#333',
-                                                border: 'none',
-                                                borderRadius: '6px',
-                                                cursor: votingId === caption.id ? 'not-allowed' : 'pointer',
-                                                fontWeight: 'bold',
-                                                transition: 'all 0.3s ease'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (votingId !== caption.id) {
-                                                    e.target.style.transform = 'scale(1.05)';
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.target.style.transform = 'scale(1)';
-                                            }}
-                                        >
-                                            👍 Upvote
-                                        </button>
-                                        <button
-                                            onClick={() => handleVote(caption.id, -1)}
-                                            disabled={votingId === caption.id}
-                                            style={{
-                                                padding: '10px 16px',
-                                                backgroundColor: userVotes[caption.id] === -1 ? '#f44336' : '#e0e0e0',
-                                                color: userVotes[caption.id] === -1 ? 'white' : '#333',
-                                                border: 'none',
-                                                borderRadius: '6px',
-                                                cursor: votingId === caption.id ? 'not-allowed' : 'pointer',
-                                                fontWeight: 'bold',
-                                                transition: 'all 0.3s ease'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (votingId !== caption.id) {
-                                                    e.target.style.transform = 'scale(1.05)';
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.target.style.transform = 'scale(1)';
-                                            }}
-                                        >
-                                            👎 Downvote
-                                        </button>
+                                    <div style={{ padding: '20px' }}>
+                                        <p style={{ color: '#000', fontSize: '16px', margin: '0 0 10px 0', lineHeight: '1.6' }}>
+                                            <strong>💬 {caption.content}</strong>
+                                        </p>
+                                        <p style={{ fontSize: '12px', color: '#999', margin: '0 0 15px 0' }}>
+                                            📅 {new Date(caption.created_datetime_utc).toLocaleDateString()}
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <button
+                                                onClick={() => handleVote(caption.id, 1)}
+                                                disabled={votingId === caption.id}
+                                                style={{
+                                                    padding: '10px 16px',
+                                                    backgroundColor: userVotes[caption.id] === 1 ? '#4CAF50' : '#e0e0e0',
+                                                    color: userVotes[caption.id] === 1 ? 'white' : '#333',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: votingId === caption.id ? 'not-allowed' : 'pointer',
+                                                    fontWeight: 'bold',
+                                                    transition: 'all 0.3s ease'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    if (votingId !== caption.id) {
+                                                        e.target.style.transform = 'scale(1.05)';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.transform = 'scale(1)';
+                                                }}
+                                            >
+                                                👍 Upvote
+                                            </button>
+                                            <button
+                                                onClick={() => handleVote(caption.id, -1)}
+                                                disabled={votingId === caption.id}
+                                                style={{
+                                                    padding: '10px 16px',
+                                                    backgroundColor: userVotes[caption.id] === -1 ? '#f44336' : '#e0e0e0',
+                                                    color: userVotes[caption.id] === -1 ? 'white' : '#333',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: votingId === caption.id ? 'not-allowed' : 'pointer',
+                                                    fontWeight: 'bold',
+                                                    transition: 'all 0.3s ease'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    if (votingId !== caption.id) {
+                                                        e.target.style.transform = 'scale(1.05)';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.transform = 'scale(1)';
+                                                }}
+                                            >
+                                                👎 Downvote
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))
