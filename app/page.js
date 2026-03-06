@@ -8,16 +8,17 @@ import { generatePresignedUrl, uploadImageToPresignedUrl, registerImageUrl, gene
 
 export default function Home() {
     const [captions, setCaptions] = useState([]);
+    const [originalCaptions, setOriginalCaptions] = useState([]);
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [userVotes, setUserVotes] = useState({});
     const [votingId, setVotingId] = useState(null);
+    const [currentIndex, setCurrentIndex] = useState(0);
     const [uploading, setUploading] = useState(false);
     const [userToken, setUserToken] = useState(null);
-    const [uploadedImage, setUploadedImage] = useState(null);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [showUpload, setShowUpload] = useState(true);
+    const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
+    const [customCaptionCount, setCustomCaptionCount] = useState(0);
     const router = useRouter();
     const supabaseClient = createClient();
 
@@ -52,7 +53,9 @@ export default function Home() {
                 .limit(50);
 
             if (error) throw error;
-            setCaptions(data);
+            const allCaptions = data || [];
+            setCaptions(allCaptions);
+            setOriginalCaptions(allCaptions);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -70,9 +73,11 @@ export default function Home() {
             if (error) throw error;
 
             const votesMap = {};
-            data.forEach(vote => {
-                votesMap[vote.caption_id] = vote.vote_value;
-            });
+            if (data) {
+                data.forEach(vote => {
+                    votesMap[vote.caption_id] = vote.vote_value;
+                });
+            }
             setUserVotes(votesMap);
         } catch (err) {
             console.error('Error fetching votes:', err);
@@ -81,12 +86,12 @@ export default function Home() {
 
     const handleImageUpload = async (e) => {
         const file = e.target.files?.[0];
-        if (!file || !userToken) return;
+        if (!file || !userToken) {
+            alert('Please select an image');
+            return;
+        }
 
         setUploading(true);
-
-        const imageUrl = URL.createObjectURL(file);
-        setUploadedImage(imageUrl);
 
         try {
             const { presignedUrl, cdnUrl } = await generatePresignedUrl(userToken, file.type);
@@ -94,13 +99,17 @@ export default function Home() {
             const { imageId } = await registerImageUrl(userToken, cdnUrl);
             const generatedCaptions = await generateCaptions(userToken, imageId);
 
-            if (generatedCaptions && Array.isArray(generatedCaptions)) {
-                setCaptions(prev => [...generatedCaptions, ...prev]);
+            if (generatedCaptions && Array.isArray(generatedCaptions) && generatedCaptions.length > 0) {
+                // Prepend custom captions to the original database captions
+                const allCaptions = [...generatedCaptions, ...originalCaptions];
+                setCaptions(allCaptions);
+                setUploadedImageUrl(cdnUrl);
+                setCustomCaptionCount(generatedCaptions.length);
                 setCurrentIndex(0);
-                setShowUpload(false);
+                alert('Image processed and captions generated! Rate these, then you\'ll continue with more captions.');
+            } else {
+                alert('No captions generated. Please try again.');
             }
-
-            alert('Image processed and captions generated!');
         } catch (err) {
             console.error('Error uploading image:', err);
             alert('Failed to process image: ' + err.message);
@@ -151,12 +160,12 @@ export default function Home() {
                 [captionId]: voteValue
             }));
 
-            // Auto-scroll to next after voting
+            // Auto-advance to next caption
             setTimeout(() => {
                 if (currentIndex < captions.length - 1) {
                     setCurrentIndex(currentIndex + 1);
                 }
-            }, 300);
+            }, 500);
         } catch (err) {
             console.error('Error voting:', err);
             alert('Failed to submit vote: ' + err.message);
@@ -170,17 +179,13 @@ export default function Home() {
         router.push('/login');
     };
 
-    // Handle keyboard scrolling
+    // Handle keyboard navigation
     useEffect(() => {
         const handleKeyPress = (e) => {
-            if (e.key === 'ArrowDown') {
-                if (currentIndex < captions.length - 1) {
-                    setCurrentIndex(currentIndex + 1);
-                }
-            } else if (e.key === 'ArrowUp') {
-                if (currentIndex > 0) {
-                    setCurrentIndex(currentIndex - 1);
-                }
+            if (e.key === 'ArrowRight' && currentIndex < captions.length - 1) {
+                setCurrentIndex(currentIndex + 1);
+            } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                setCurrentIndex(currentIndex - 1);
             }
         };
 
@@ -188,208 +193,385 @@ export default function Home() {
         return () => window.removeEventListener('keydown', handleKeyPress);
     }, [currentIndex, captions.length]);
 
-    if (loading) return (
-        <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            fontSize: '18px',
-            color: '#666'
-        }}>
-            Loading...
-        </div>
-    );
+    if (loading) {
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                fontSize: '18px',
+                color: '#fff'
+            }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div style={{
+                        fontSize: '48px',
+                        marginBottom: '20px',
+                        animation: 'bounce 2s infinite'
+                    }}>
+                        🎬
+                    </div>
+                    <p>Loading your captions...</p>
+                </div>
+            </div>
+        );
+    }
+
     if (!user) return null;
-    if (error) return <div style={{ padding: '20px', color: '#f44336', fontSize: '16px' }}>Error: {error}</div>;
+
+    if (error) {
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                padding: '20px',
+                color: '#f44336'
+            }}>
+                <div style={{ textAlign: 'center' }}>
+                    <h2>Error Loading Captions</h2>
+                    <p>{error}</p>
+                </div>
+            </div>
+        );
+    }
 
     const currentCaption = captions[currentIndex];
+    const progressPercentage = captions.length > 0 ? ((currentIndex + 1) / captions.length) * 100 : 0;
 
-    return (
-        <main style={{ background: '#000000', minHeight: '100vh', overflow: 'hidden' }}>
-            {/* Header */}
-            <header style={{
+    if (captions.length === 0) {
+        return (
+            <main style={{
+                minHeight: '100vh',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                padding: '15px 20px',
-                color: 'white',
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-                position: 'relative',
-                zIndex: 10
+                flexDirection: 'column',
+                overflow: 'hidden'
             }}>
-                <div>
-                    <h1 style={{ margin: '0', fontSize: '24px' }}>🎬 Humor Project</h1>
-                </div>
-                <button
-                    onClick={handleLogout}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        color: 'white',
-                        border: '2px solid white',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '12px',
-                        transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = 'rgba(255,255,255,0.3)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
-                    }}
-                >
-                    Logout
-                </button>
-            </header>
+                {/* Header */}
+                <header style={{
+                    padding: '20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'rgba(0,0,0,0.2)',
+                    backdropFilter: 'blur(10px)',
+                    borderBottom: '2px solid rgba(255,255,255,0.1)'
+                }}>
+                    <h1 style={{ margin: '0', color: 'white', fontSize: '28px', fontWeight: 'bold' }}>🎬 The Humor Project</h1>
+                    <button
+                        onClick={handleLogout}
+                        aria-label="Logout"
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                            border: '2px solid white',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = 'rgba(255,255,255,0.3)';
+                            e.target.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                            e.target.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        Logout
+                    </button>
+                </header>
 
-            {/* Upload Section - Show only if no captions */}
-            {showUpload && captions.length === 0 && (
+                {/* Empty State with Upload */}
                 <div style={{
+                    flex: 1,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minHeight: 'calc(100vh - 70px)',
-                    padding: '20px'
+                    padding: '40px 20px'
                 }}>
                     <div style={{
-                        backgroundColor: '#ffffff',
-                        borderRadius: '12px',
+                        background: 'rgba(255,255,255,0.95)',
+                        backdropFilter: 'blur(10px)',
+                        borderRadius: '24px',
                         padding: '60px 40px',
                         maxWidth: '500px',
                         width: '100%',
                         textAlign: 'center',
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
                     }}>
-                        <h2 style={{ color: '#000', fontSize: '28px', marginBottom: '15px' }}>
-                            📸 Upload Your First Image
+                        <div style={{
+                            fontSize: '80px',
+                            marginBottom: '30px',
+                            animation: 'float 3s ease-in-out infinite'
+                        }}>
+                            📸
+                        </div>
+                        <h2 style={{
+                            color: '#1a1a1a',
+                            fontSize: '28px',
+                            margin: '0 0 15px 0',
+                            fontWeight: 'bold'
+                        }}>
+                            Upload Your First Image
                         </h2>
-                        <p style={{ color: '#666', marginBottom: '30px', fontSize: '16px', lineHeight: '1.6' }}>
-                            Upload an image and our AI will generate hilarious captions. Then rate them like you're scrolling through TikTok!
+                        <p style={{
+                            color: '#666',
+                            fontSize: '16px',
+                            margin: '0 0 40px 0',
+                            lineHeight: '1.6'
+                        }}>
+                            Upload an image and our AI will generate hilarious captions. Then rate them!
                         </p>
 
-                        <label style={{
-                            display: 'inline-block',
-                            padding: '14px 32px',
-                            backgroundColor: '#4CAF50',
-                            color: 'white',
-                            borderRadius: '8px',
-                            cursor: uploading ? 'not-allowed' : 'pointer',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            transition: 'all 0.3s ease',
-                            boxShadow: '0 4px 15px rgba(76,175,80,0.3)'
-                        }}
-                               onMouseEnter={(e) => {
-                                   if (!uploading) {
-                                       e.target.style.backgroundColor = '#45a049';
-                                       e.target.style.transform = 'translateY(-2px)';
-                                       e.target.style.boxShadow = '0 6px 20px rgba(76,175,80,0.4)';
-                                   }
-                               }}
-                               onMouseLeave={(e) => {
-                                   e.target.style.backgroundColor = '#4CAF50';
-                                   e.target.style.transform = 'translateY(0)';
-                                   e.target.style.boxShadow = '0 4px 15px rgba(76,175,80,0.3)';
-                               }}>
+                        <label
+                            htmlFor="image-upload"
+                            style={{
+                                display: 'inline-block',
+                                padding: '16px 32px',
+                                backgroundColor: '#4CAF50',
+                                color: 'white',
+                                borderRadius: '8px',
+                                cursor: uploading ? 'not-allowed' : 'pointer',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                transition: 'all 0.3s ease',
+                                boxShadow: '0 4px 15px rgba(76,175,80,0.3)',
+                                opacity: uploading ? 0.7 : 1
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!uploading) {
+                                    e.target.style.backgroundColor = '#45a049';
+                                    e.target.style.transform = 'translateY(-2px)';
+                                    e.target.style.boxShadow = '0 6px 20px rgba(76,175,80,0.4)';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = '#4CAF50';
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = '0 4px 15px rgba(76,175,80,0.3)';
+                            }}
+                        >
                             {uploading ? '⏳ Processing...' : '📁 Choose Image'}
                             <input
+                                id="image-upload"
                                 type="file"
                                 accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
                                 onChange={handleImageUpload}
                                 disabled={uploading}
+                                aria-label="Upload image file"
                                 style={{ display: 'none' }}
                             />
                         </label>
-
-                        {uploadedImage && (
-                            <div style={{ marginTop: '30px' }}>
-                                <p style={{ color: '#666', marginBottom: '10px' }}>Preview:</p>
-                                <img
-                                    src={uploadedImage}
-                                    alt="Uploaded"
-                                    style={{
-                                        maxWidth: '100%',
-                                        height: 'auto',
-                                        maxHeight: '250px',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                            </div>
-                        )}
                     </div>
                 </div>
-            )}
 
-            {/* Captions Reel Section */}
-            {!showUpload && captions.length > 0 && currentCaption && (
+                <style>{`
+                    @keyframes float {
+                        0%, 100% { transform: translateY(0px); }
+                        50% { transform: translateY(-20px); }
+                    }
+                    @keyframes bounce {
+                        0%, 100% { transform: scale(1); }
+                        50% { transform: scale(1.1); }
+                    }
+                `}</style>
+            </main>
+        );
+    }
+
+    return (
+        <main style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+        }}>
+            {/* Header */}
+            <header style={{
+                padding: '20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'rgba(0,0,0,0.2)',
+                backdropFilter: 'blur(10px)',
+                borderBottom: '2px solid rgba(255,255,255,0.1)'
+            }}>
+                <div>
+                    <h1 style={{ margin: '0', color: 'white', fontSize: '28px', fontWeight: 'bold' }}>🎬 The Humor Project</h1>
+                    <p style={{ margin: '5px 0 0 0', color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>
+                        Logged in as: {user.email}
+                    </p>
+                </div>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                    <label
+                        htmlFor="upload-image"
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: 'rgba(76,175,80,0.8)',
+                            color: 'white',
+                            border: '2px solid #4CAF50',
+                            borderRadius: '8px',
+                            cursor: uploading ? 'not-allowed' : 'pointer',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            transition: 'all 0.3s ease',
+                            opacity: uploading ? 0.7 : 1
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!uploading) {
+                                e.target.style.backgroundColor = '#4CAF50';
+                                e.target.style.transform = 'translateY(-2px)';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'rgba(76,175,80,0.8)';
+                            e.target.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        {uploading ? '⏳ Processing...' : '📸 Upload Image'}
+                        <input
+                            id="upload-image"
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
+                            onChange={handleImageUpload}
+                            disabled={uploading}
+                            aria-label="Upload new image"
+                            style={{ display: 'none' }}
+                        />
+                    </label>
+                    <button
+                        onClick={handleLogout}
+                        aria-label="Logout"
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                            border: '2px solid white',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = 'rgba(255,255,255,0.3)';
+                            e.target.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                            e.target.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        Logout
+                    </button>
+                </div>
+            </header>
+
+            {/* Progress Bar */}
+            <div style={{
+                width: '100%',
+                height: '8px',
+                background: 'rgba(255,255,255,0.2)',
+                position: 'relative',
+                role: 'progressbar',
+                ariaValuenow: Math.round(progressPercentage),
+                ariaValuemin: 0,
+                ariaValuemax: 100
+            }}>
                 <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 'calc(100vh - 70px)',
-                    padding: '20px',
-                    position: 'relative'
-                }}>
-                    {/* Caption Card */}
-                    <div style={{
-                        backgroundColor: '#1a1a1a',
-                        borderRadius: '16px',
-                        overflow: 'hidden',
-                        maxWidth: '500px',
-                        width: '100%',
-                        maxHeight: '85vh',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
-                        animation: 'fadeIn 0.3s ease-in'
-                    }}>
-                        {/* Image Section */}
-                        {currentCaption.images && currentCaption.images.url && (
+                    height: '100%',
+                    width: `${progressPercentage}%`,
+                    background: 'linear-gradient(90deg, #4CAF50 0%, #45a049 100%)',
+                    transition: 'width 0.6s ease-in-out'
+                }} />
+            </div>
+
+            {/* Main Content */}
+            <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '40px 20px',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                {/* Background blur effect */}
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%)',
+                    pointerEvents: 'none'
+                }} />
+
+                {/* Caption Card */}
+                {currentCaption && (
+                    <div
+                        key={currentIndex}
+                        style={{
+                            position: 'relative',
+                            zIndex: 1,
+                            maxWidth: '600px',
+                            width: '100%',
+                            animation: 'slideIn 0.5s ease-out'
+                        }}
+                    >
+
+
+                        {/* Image Container - Show uploaded image for custom captions, original for database captions */}
+                        {(currentIndex < customCaptionCount ? uploadedImageUrl : (currentCaption.images && currentCaption.images.url)) && (
                             <div style={{
                                 width: '100%',
-                                flex: '1',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: '#000000',
-                                minHeight: '300px'
+                                aspectRatio: '1/1',
+                                borderRadius: '24px',
+                                overflow: 'hidden',
+                                marginBottom: '30px',
+                                boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+                                background: '#000'
                             }}>
                                 <img
-                                    src={currentCaption.images.url}
-                                    alt={currentCaption.content}
+                                    src={currentIndex < customCaptionCount ? uploadedImageUrl : currentCaption.images.url}
+                                    alt="Caption image"
                                     style={{
                                         width: '100%',
                                         height: '100%',
-                                        objectFit: 'contain'
+                                        objectFit: 'cover',
+                                        display: 'block'
                                     }}
                                 />
                             </div>
                         )}
 
-                        {/* Text Section */}
+                        {/* Caption Text Container */}
                         <div style={{
-                            padding: '20px',
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            borderTop: '1px solid #333',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '15px'
+                            background: 'rgba(255,255,255,0.95)',
+                            backdropFilter: 'blur(10px)',
+                            borderRadius: '20px',
+                            padding: '30px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+                            marginBottom: '30px'
                         }}>
                             <p style={{
-                                color: '#ffffff',
-                                fontSize: '18px',
-                                margin: '0',
-                                lineHeight: '1.5',
-                                fontWeight: '500'
+                                fontSize: '24px',
+                                fontWeight: '600',
+                                color: '#1a1a1a',
+                                margin: '0 0 15px 0',
+                                lineHeight: '1.5'
                             }}>
                                 💬 {currentCaption.content}
                             </p>
-
                             <p style={{
                                 fontSize: '12px',
                                 color: '#999',
@@ -397,129 +579,198 @@ export default function Home() {
                             }}>
                                 📅 {new Date(currentCaption.created_datetime_utc).toLocaleDateString()}
                             </p>
+                        </div>
 
-                            {/* Vote Buttons */}
-                            <div style={{
-                                display: 'flex',
-                                gap: '10px',
-                                marginTop: '10px'
-                            }}>
-                                <button
-                                    onClick={() => handleVote(currentCaption.id, 1)}
-                                    disabled={votingId === currentCaption.id}
-                                    style={{
-                                        flex: '1',
-                                        padding: '12px 16px',
-                                        backgroundColor: userVotes[currentCaption.id] === 1 ? '#4CAF50' : '#333333',
-                                        color: userVotes[currentCaption.id] === 1 ? 'white' : '#ffffff',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        cursor: votingId === currentCaption.id ? 'not-allowed' : 'pointer',
-                                        fontWeight: 'bold',
-                                        fontSize: '14px',
-                                        transition: 'all 0.3s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (votingId !== currentCaption.id) {
-                                            e.target.style.backgroundColor = '#4CAF50';
-                                            e.target.style.transform = 'scale(1.05)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (userVotes[currentCaption.id] !== 1) {
-                                            e.target.style.backgroundColor = '#333333';
-                                        }
-                                        e.target.style.transform = 'scale(1)';
-                                    }}
-                                >
-                                    👍 Upvote
-                                </button>
-                                <button
-                                    onClick={() => handleVote(currentCaption.id, -1)}
-                                    disabled={votingId === currentCaption.id}
-                                    style={{
-                                        flex: '1',
-                                        padding: '12px 16px',
-                                        backgroundColor: userVotes[currentCaption.id] === -1 ? '#f44336' : '#333333',
-                                        color: userVotes[currentCaption.id] === -1 ? 'white' : '#ffffff',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        cursor: votingId === currentCaption.id ? 'not-allowed' : 'pointer',
-                                        fontWeight: 'bold',
-                                        fontSize: '14px',
-                                        transition: 'all 0.3s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (votingId !== currentCaption.id) {
-                                            e.target.style.backgroundColor = '#f44336';
-                                            e.target.style.transform = 'scale(1.05)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (userVotes[currentCaption.id] !== -1) {
-                                            e.target.style.backgroundColor = '#333333';
-                                        }
-                                        e.target.style.transform = 'scale(1)';
-                                    }}
-                                >
-                                    👎 Downvote
-                                </button>
-                            </div>
+                        {/* Vote Buttons */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '15px',
+                            justifyContent: 'center',
+                            marginBottom: '20px'
+                        }}>
+                            <button
+                                onClick={() => handleVote(currentCaption.id, 1)}
+                                disabled={votingId === currentCaption.id}
+                                aria-label="Upvote this caption"
+                                aria-pressed={userVotes[currentCaption.id] === 1}
+                                style={{
+                                    flex: 1,
+                                    padding: '16px 24px',
+                                    fontSize: '18px',
+                                    fontWeight: 'bold',
+                                    backgroundColor: userVotes[currentCaption.id] === 1 ? '#4CAF50' : 'rgba(255,255,255,0.2)',
+                                    color: userVotes[currentCaption.id] === 1 ? '#fff' : '#fff',
+                                    border: '2px solid rgba(255,255,255,0.4)',
+                                    borderRadius: '12px',
+                                    cursor: votingId === currentCaption.id ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    opacity: votingId === currentCaption.id ? 0.7 : 1,
+                                    backdropFilter: 'blur(10px)',
+                                    minHeight: '50px'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (votingId !== currentCaption.id) {
+                                        e.target.style.backgroundColor = '#4CAF50';
+                                        e.target.style.transform = 'translateY(-4px)';
+                                        e.target.style.boxShadow = '0 8px 20px rgba(76,175,80,0.4)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (userVotes[currentCaption.id] !== 1) {
+                                        e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                                    }
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = 'none';
+                                }}
+                            >
+                                👍 Love It
+                            </button>
+                            <button
+                                onClick={() => handleVote(currentCaption.id, -1)}
+                                disabled={votingId === currentCaption.id}
+                                aria-label="Downvote this caption"
+                                aria-pressed={userVotes[currentCaption.id] === -1}
+                                style={{
+                                    flex: 1,
+                                    padding: '16px 24px',
+                                    fontSize: '18px',
+                                    fontWeight: 'bold',
+                                    backgroundColor: userVotes[currentCaption.id] === -1 ? '#f44336' : 'rgba(255,255,255,0.2)',
+                                    color: userVotes[currentCaption.id] === -1 ? '#fff' : '#fff',
+                                    border: '2px solid rgba(255,255,255,0.4)',
+                                    borderRadius: '12px',
+                                    cursor: votingId === currentCaption.id ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    opacity: votingId === currentCaption.id ? 0.7 : 1,
+                                    backdropFilter: 'blur(10px)',
+                                    minHeight: '50px'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (votingId !== currentCaption.id) {
+                                        e.target.style.backgroundColor = '#f44336';
+                                        e.target.style.transform = 'translateY(-4px)';
+                                        e.target.style.boxShadow = '0 8px 20px rgba(244,67,54,0.4)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (userVotes[currentCaption.id] !== -1) {
+                                        e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                                    }
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = 'none';
+                                }}
+                            >
+                                👎 Not for Me
+                            </button>
+                        </div>
+
+                        {/* Counter and Navigation */}
+                        <div style={{
+                            textAlign: 'center',
+                            color: 'rgba(255,255,255,0.8)',
+                            fontSize: '14px'
+                        }}>
+                            <p style={{ margin: '0 0 10px 0' }} role="status" aria-live="polite">
+                                <strong>{currentIndex + 1}</strong> of <strong>{captions.length}</strong> ({Math.round(progressPercentage)}%)
+                            </p>
+                            <p style={{ margin: '0', fontSize: '12px' }}>
+                                💡 Use arrow keys or buttons to navigate
+                            </p>
+                        </div>
+
+                        {/* Navigation Buttons */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '10px',
+                            justifyContent: 'center',
+                            marginTop: '20px'
+                        }}>
+                            <button
+                                onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+                                disabled={currentIndex === 0}
+                                aria-label="Previous caption"
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
+                                    color: 'white',
+                                    border: '2px solid rgba(255,255,255,0.4)',
+                                    borderRadius: '8px',
+                                    cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
+                                    fontWeight: 'bold',
+                                    opacity: currentIndex === 0 ? 0.5 : 1,
+                                    transition: 'all 0.3s ease',
+                                    backdropFilter: 'blur(10px)'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (currentIndex > 0) {
+                                        e.target.style.backgroundColor = 'rgba(255,255,255,0.3)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                                }}
+                            >
+                                ← Previous
+                            </button>
+                            <button
+                                onClick={() => setCurrentIndex(Math.min(captions.length - 1, currentIndex + 1))}
+                                disabled={currentIndex === captions.length - 1}
+                                aria-label="Next caption"
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
+                                    color: 'white',
+                                    border: '2px solid rgba(255,255,255,0.4)',
+                                    borderRadius: '8px',
+                                    cursor: currentIndex === captions.length - 1 ? 'not-allowed' : 'pointer',
+                                    fontWeight: 'bold',
+                                    opacity: currentIndex === captions.length - 1 ? 0.5 : 1,
+                                    transition: 'all 0.3s ease',
+                                    backdropFilter: 'blur(10px)'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (currentIndex < captions.length - 1) {
+                                        e.target.style.backgroundColor = 'rgba(255,255,255,0.3)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                                }}
+                            >
+                                Next →
+                            </button>
                         </div>
                     </div>
-
-                    {/* Navigation Info */}
-                    <div style={{
-                        marginTop: '20px',
-                        color: '#999',
-                        fontSize: '14px',
-                        textAlign: 'center'
-                    }}>
-                        <p style={{ margin: '0' }}>
-                            {currentIndex + 1} of {captions.length}
-                        </p>
-                        <p style={{ margin: '5px 0 0 0', fontSize: '12px' }}>
-                            Use arrow keys or scroll to navigate
-                        </p>
-                    </div>
-
-                    {/* Upload New Button */}
-                    <button
-                        onClick={() => setShowUpload(true)}
-                        style={{
-                            marginTop: '20px',
-                            padding: '10px 20px',
-                            backgroundColor: '#667eea',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            transition: 'all 0.3s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#764ba2';
-                            e.target.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = '#667eea';
-                            e.target.style.transform = 'translateY(0)';
-                        }}
-                    >
-                        📸 Upload New Image
-                    </button>
-                </div>
-            )}
+                )}
+            </div>
 
             <style>{`
-                @keyframes fadeIn {
+                @keyframes slideIn {
                     from {
                         opacity: 0;
-                        transform: translateY(20px);
+                        transform: translateY(30px);
                     }
                     to {
                         opacity: 1;
                         transform: translateY(0);
+                    }
+                }
+
+                @keyframes float {
+                    0%, 100% {
+                        transform: translateY(0px);
+                    }
+                    50% {
+                        transform: translateY(-20px);
+                    }
+                }
+
+                @keyframes bounce {
+                    0%, 100% {
+                        transform: scale(1);
+                    }
+                    50% {
+                        transform: scale(1.1);
                     }
                 }
             `}</style>
