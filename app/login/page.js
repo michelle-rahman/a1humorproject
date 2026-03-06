@@ -2,8 +2,9 @@
 
 import { createClient } from '@/lib/supabase-client';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function LoginPage() {
+function LoginContent() {
     const searchParams = useSearchParams();
     const error = searchParams.get('error');
 
@@ -566,5 +567,25 @@ export default function LoginPage() {
         }
       `}</style>
         </main>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '18px'
+            }}>
+                Loading...
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     );
 }
